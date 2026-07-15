@@ -1,0 +1,290 @@
+**Google Dorking Cheat Sheet (2026 Edition)**  
+Tailored for bug bounty hunters, with emphasis on **OAuth misconfigurations**, **cloud (AWS Cognito)**, **APIs**, **exposed secrets**, **AI-related exposures**, and general recon — inspired by your `source.txt` materials (BruteCat AI hacking, OAuth writeups, Cognito risks, etc.).
+
+### Core Operators Recap
+- `site:target.com` — Focus on domain
+- `inurl:` — Keyword in URL
+- `intitle:` — Keyword in title
+- `filetype:` or `ext:` — File extensions
+- `intext:` / `allintext:` — Content search
+- Combine with `-github.com -stackoverflow.com` to reduce noise
+
+### 1. General Bug Bounty Recon (Programs & Endpoints)
+```
+site:target.com inurl:/.well-known/security.txt
+site:target.com "bug bounty" OR "vulnerability disclosure" OR "report security"
+inurl:/.git/ OR inurl:/.svn/ OR inurl:/.env site:target.com
+site:target.com intitle:"index of" (backup | config | logs)
+site:target.com inurl:admin OR inurl:dashboard OR inurl:login
+```
+
+### 2. Exposed Secrets & Config Files (High Impact)
+```
+site:target.com filetype:env ("DB_PASSWORD" OR "AWS_SECRET" OR "API_KEY")
+site:target.com ext:env OR ext:yaml OR ext:yml OR ext:json "password" OR "secret" OR "key"
+site:target.com inurl:.env "AKIA" (AWS keys)
+site:target.com filetype:sql ("INSERT INTO" OR "password")
+site:target.com "sk-" OR "pk-" (Stripe/OpenAI-style keys)
+site:target.com intext:"Cognito" OR "UserPoolId" OR "IdentityPoolId" filetype:js OR filetype:json
+```
+
+### 3. OAuth-Specific Dorks (Critical for Account Takeover)
+From OAuth writeups in your source (misconfigs, redirect_uri issues, etc.):
+```
+site:target.com inurl:(oauth | authorize | token | callback) inurl:(client_id OR redirect_uri)
+site:target.com inurl:authorize?response_type=code
+site:target.com inurl:oauth intext:"redirect_uri"
+site:target.com inurl:login OR inurl:signin (google | facebook | "oauth")
+site:target.com inurl:.well-known/openid-configuration
+site:target.com inurl:/.well-known/oauth-authorization-server
+site:target.com intitle:"OAuth" OR intitle:"Single Sign-On" OR intitle:"SSO"
+site:target.com inurl:callback (dev | staging | localhost | test)
+```
+
+**Advanced OAuth Chains**:
+- Look for open redirect in redirect_uri param → Combine with manual testing (as in the Medium writeups).
+- Search for exposed client secrets or misconfigured DCR (Dynamic Client Registration).
+
+### 4. AWS Cognito & Cloud Misconfigs (From Doyensec & Similar)
+```
+site:target.com "cognito" OR "userpool" OR "aws.amazon.com/cognito"
+site:target.com inurl:cognito OR inurl:identitypool
+site:target.com filetype:js ("CognitoUserPool" OR "AWSCognito" OR "userPoolId")
+site:target.com "aws_access_key_id" OR "aws_secret_access_key"
+site:target.com inurl:amazonaws.com intext:"Cognito"
+```
+
+### 5. API & Developer Exposures
+```
+site:target.com inurl:api OR inurl:graphql OR inurl:swagger OR inurl:docs
+site:target.com filetype:json OR filetype:yaml inurl:api (key OR token)
+site:target.com inurl:/api/v1 OR /api/v2 intitle:"index of"
+site:target.com intext:"Bearer" OR "Authorization:" filetype:txt OR filetype:log
+```
+
+### 6. Error Messages & Tech Stack Leaks
+```
+site:target.com intext:"SQL syntax" OR "mysql_fetch" OR "ODBC" OR "ORA-" (SQLi hints)
+site:target.com intext:"PHP Warning" OR "PHP Error" OR "Stack trace"
+site:target.com intitle:"error" inurl:log
+```
+
+### 7. AI / ML / Supply Chain Related (From your source)
+```
+site:target.com inurl:github.io OR inurl:vercel.app OR inurl:render.com (exposed repos)
+site:target.com "Claude" OR "Anthropic" OR "Spring AI" inurl:config OR filetype:env
+site:target.com inurl:vector OR inurl:embedding (for vector store exposures)
+intitle:"index of" site:target.com (model | weights | dataset)
+```
+
+### 8. Login Panels & Admin Interfaces
+```
+intitle:"login" OR intitle:"sign in" site:target.com inurl:admin
+intitle:"phpMyAdmin" OR intitle:"administrator" site:target.com
+site:target.com inurl:wp-admin OR inurl:administrator OR inurl:manager
+```
+
+### 9. File & Backup Leaks
+```
+site:target.com intitle:"index of" (backup | dump | db | old)
+site:target.com filetype:pdf OR filetype:xlsx ("confidential" OR "password" OR "internal")
+site:target.com filetype:bak OR filetype:old OR filetype:backup
+```
+
+### 10. Bonus Power Dorks (AI-Assisted Style — BruteCat Inspired)
+Replace `target.com` and run in bulk:
+- `site:*.target.com` (subdomain discovery)
+- `site:target.com ext:php OR ext:asp OR ext:jsp inurl:upload`
+- `site:target.com intext:"Access Key" OR "Secret Key"`
+- `site:target.com "-----BEGIN PRIVATE KEY-----"`
+
+**Pro Tips**:
+- Use tools like **Google Dorking scripts**, **DorkForge**, or automate with AI (as in the Hacking Google with AI article).
+- Always add `site:target.com` + program scope.
+- Chain with Nuclei templates (from ProjectDiscovery blog in your source).
+- For OAuth: After finding flows, test redirect_uri manipulation, PKCE bypass, open registration, etc.
+- Ethical note: Only use on in-scope bug bounty programs.
+
+
+
+
+**Git Dorking + Shodan Dorking Cheat Sheet (2026 Edition)**
+
+Continuing from Google Dorking, here are powerful techniques for **Git** (exposed repos/directories + GitHub searches) and **Shodan** (internet-wide device/service scanning). These are high-value in bug bounty and recon, especially when chained with OAuth, cloud (Cognito), API, and secret exposures from your source materials.
+
+### 1. Git Dorking / Exposed .git Directories
+
+**Exposed `.git/` folders** are a critical misconfiguration. They allow full source code reconstruction, including secrets, configs, and history.
+
+#### Discovery Dorks (Google + Others)
+```
+site:target.com inurl:/.git/ OR inurl:/.git/config
+intitle:"index of" ".git"
+site:target.com filetype:git OR inurl:.git/HEAD
+site:target.com inurl:.git/config "core.repositoryformatversion"
+inurl:/.git/ site:target.com -github.com
+```
+
+**Automated Tools**:
+- `git-dumper.sh https://target.com/.git/ output/`
+- `git-dumper` / `GitTools` suite
+- `ffuf -u https://target.com/FUZZ -w wordlist.txt` with `.git/`, `.env`, etc.
+- DotGit Chrome extension for alerts.
+
+**Exploitation Steps** (when `.git` is exposed):
+1. Download the directory recursively.
+2. Run `git status`, `git log`, `git checkout`, `git fsck` to recover files.
+3. Grep for secrets: `grep -r "password\|key\|secret\|AKIA" .`
+
+**Impact**: Source code leak → hardcoded OAuth secrets, DB creds, AWS keys → Account Takeover or RCE.
+
+### 2. GitHub Dorking (for Secrets & OAuth Leaks)
+
+GitHub advanced search operators are excellent for finding leaked keys across public repos.
+
+#### Core GitHub Search Operators
+- `filename:.env`
+- `extension:env`
+- `path:.github` (workflows often contain secrets)
+- `language:yaml` or `language:json`
+- `org:targetorg` (if known)
+
+#### High-Impact GitHub Dorks for Secrets
+```
+filename:.env ("DB_PASSWORD" OR "AWS_SECRET" OR "CLIENT_SECRET" OR "OAUTH")
+filename:.env "cognito" OR "userpool"
+"AKIA" filename:.env OR filename:.js OR filename:.json (AWS keys)
+"ghp_" OR "gho_" OR "github_pat_" (GitHub tokens)
+"sk-" OR "pk-" OR "stripe" (payment/OAuth keys)
+filename:config "client_secret" OR "redirect_uri"
+inurl:settings OR inurl:secrets "oauth"
+"Bearer" OR "Authorization:" extension:js OR extension:py
+```
+
+**OAuth / Cognito Specific**:
+- `cognito` OR `userPoolId` OR `IdentityPoolId` extension:js OR extension:json
+- `"aws_cognito"` OR `"CognitoUserPool"`
+
+**Pro Tips**:
+- Use GitHub’s advanced search + filters (stars, language, etc.).
+- Tools: `gitleaks`, `trufflehog`, `git-secrets`.
+- Always check forks and old commits.
+
+### 3. Shodan Dorking (Internet-Wide Recon)
+
+Shodan indexes banners, services, devices, and vulnerabilities — perfect for finding exposed OAuth endpoints, admin panels, cloud services, etc.
+
+#### Core Shodan Filters
+- `org:"Target Company"` — Organization filter
+- `hostname:target.com` or `domain:target.com`
+- `net:IP/range` — IP blocks
+- `port:443` or `port:80`
+- `product:Apache` / `product:Nginx`
+- `country:US` / `city:NewYork`
+- `ssl:"target.com"` — Certificate searches
+- `http.title:"Login"` or `http.html:"oauth"`
+- `http.status:200` / `http.status:403`
+
+#### Bug Bounty / Security Focused Shodan Dorks
+**General Recon**:
+```
+hostname:target.com
+org:"Target Inc" port:443
+domain:target.com http.title:"Admin" OR "Dashboard"
+```
+
+**OAuth / API / Login**:
+```
+http.html:"oauth" OR http.html:"authorize" OR http.html:"client_id"
+http.title:"OAuth" OR http.title:"SSO" OR http.title:"Login"
+port:443 "cognito" OR "userpool"
+http.component:"oauth2" OR http.html:"redirect_uri"
+```
+
+**Cloud & Exposed Services**:
+```
+"cognito" OR "aws cognito" hostname:target.com
+"amazonaws" port:443
+"S3" OR "bucket" http.html
+port:22 OR port:3389 (SSH/RDP — risky exposures)
+```
+
+**Vulnerable / Juicy**:
+```
+http.status:200 product:"phpMyAdmin"
+"index of" port:80 OR port:443
+"SQL syntax" OR "error" http.html
+"Spring" OR "MariaDB" (for vector store / CVE hunting)
+```
+
+**Advanced Chains**:
+- `org:"Target" ssl:"Target"` → Filter by certs
+- Combine with `after:2025-01-01` or `before:` for recent exposures
+- Use Shodan’s favicon hash for specific apps
+
+**Tools & Workflow**:
+- Shodan CLI / Web
+- Combine with Nuclei for scanning results
+- Export IPs → mass scanning with `httpx`, `nuclei`, etc.
+- Chain with Google/Git dorks for full picture.
+
+### Best Practices & Chaining (Inspired by Your Source)
+- **AI-Assisted**: Use models to generate/refine dorks at scale (BruteCat style).
+- **Workflow**: Google/GitHub → find endpoints/secrets → Shodan for exposed instances → Nuclei templates.
+- **OAuth Focus**: Look for misconfigured flows, exposed redirect_uris, Cognito pools.
+- **Ethics**: Only in-scope targets. Report responsibly.
+- **Defense**: Block `.git/`, use `.gitignore`, secret scanning, WAF, proper cloud configs.
+
+filename:.env
+filename:.env "DB_PASSWORD" OR "CLIENT_SECRET" OR "OAUTH" OR "COGNITO"
+"AKIA" filename:.env OR filename:*.js OR filename:*.json
+"ghp_" OR "github_pat_"
+"cognito" OR "userPoolId" OR "IdentityPoolId" extension:js OR extension:json
+filename:config "client_secret" OR "redirect_uri"
+"path:.github/workflows" "secret" OR "token"
+ 
+Tools: gitleaks, trufflehog, git-secrets
+ 
+## 2. Shodan Dorking
+ 
+### Basic Filters
+hostname:target.com
+domain:target.com
+org:"Target Company"
+port:80 OR port:443
+ssl:"target.com"
+ 
+### OAuth / Auth Focused
+http.html:"oauth" OR http.html:"authorize" OR http.html:"client_id"
+http.title:"OAuth" OR http.title:"Login" OR http.title:"SSO"
+"cognito" OR "userpool" OR "aws cognito"
+http.html:"redirect_uri"
+http.component:"oauth2"
+ 
+### Secrets & Exposed Services
+http.html:"AKIA" OR http.html:"sk-" OR http.html:"password"
+"index of" port:80 OR port:443
+phpMyAdmin OR "admin panel" http.title
+http.html:"Spring" OR "MariaDB" (CVE hunting)
+ 
+### Cloud & API
+"S3" OR "bucket" OR "amazonaws"
+port:443 "api" OR "graphql"
+http.status:200 "key" OR "token"
+ 
+### Advanced
+org:"Target" port:443 ssl:"target.com"
+after:"2025-01-01" hostname:target.com
+http.favicon.hash: specific_favicon_hash
+ 
+## Chaining Workflow
+1. Google/GitHub → Find endpoints & secrets
+2. Shodan → Discover exposed instances
+3. Nuclei / ffuf / manual testing → Exploit (OAuth misconfigs, SQLi, etc.)
+4. AI assistance for bulk dork generation (BruteCat style)
+ 
+Always respect bug bounty scope. Use responsibly
+
+
+
+

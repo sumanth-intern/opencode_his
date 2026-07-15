@@ -1,0 +1,197 @@
+import Store from '@src/store'
+import actions from '@src/store/actions'
+import { errorTypes } from '@src/scripts/enums'
+import { uuid } from '@src/scripts/helpers'
+
+const correlationId = uuid()
+
+export function call(method, body) {
+  const { accessToken } = Store.getters
+
+  return fetch(fullUrl(method), {
+    method: 'POST',
+    cache: 'no-cache',
+    mode: 'cors',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Correlation-Id': correlationId
+    },
+    body: JSON.stringify(body)
+  })
+    .then(convertResponse)
+    .catch(errorHandler)
+}
+
+export function get(method) {
+  const { accessToken } = Store.getters
+
+  return fetch(fullUrl(method), {
+    method: 'GET',
+    cache: 'no-cache',
+    mode: 'cors',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Correlation-Id': correlationId
+    }
+  })
+    .then(convertResponse)
+    .catch(errorHandler)
+}
+
+export function put(method, body) {
+  const { accessToken } = Store.getters
+
+  return fetch(fullUrl(method), {
+    method: 'PUT',
+    cache: 'no-cache',
+    mode: 'cors',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Correlation-Id': correlationId
+    },
+    body: JSON.stringify(body)
+  })
+    .then(convertResponse)
+    .catch(errorHandler)
+}
+
+export function sendFile(method, body) {
+  const { accessToken } = Store.getters
+
+  return fetch(fullUrl(method), {
+    method: 'POST',
+    cache: 'no-cache',
+    mode: 'cors',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Correlation-Id': correlationId
+    },
+    body
+  })
+    .then(convertResponse)
+    .catch(errorHandler)
+}
+
+async function convertResponse(response) {
+  if (response.status === 200) {
+    const contentType = response.headers.get('content-type')
+    if (!contentType) {
+      return {}
+    }
+    const { error, data } = await response.json()
+
+    if (error) return { error }
+    return { data }
+  }
+  if (response.status === 400) {
+    const { reason, error } = await response.json()
+
+    return {
+      error: reason || error || errorTypes.failed,
+      status: 400
+    }
+  }
+  if (response.status === 401) {
+    Store.dispatch(actions.updateToken)
+    return {
+      error: errorTypes.unauthorized,
+      status: 401
+    }
+  }
+  if (response.status === 403) {
+    const { error } = await response.json()
+    return {
+      error: error || errorTypes.forbidden,
+      status: 403
+    }
+  }
+  if (response.status === 404) {
+    const { reason, error } = await response.json()
+
+    return {
+      error: reason || error || errorTypes.notFound,
+      status: 404
+    }
+  }
+  return {
+    error: errorTypes.failed
+  }
+}
+
+function errorHandler() {
+  return {
+    error: errorTypes.failed
+  }
+}
+
+function fullUrl(path) {
+  return `${BaseUrl.api}/app/${path}`
+}
+
+export default {
+  abort: 'abort',
+  acceptTerms: 'accept-terms-and-conditions',
+  actionLog: 'actions',
+  alternativeLoginVerification: 'kyb-identification/verification',
+  callCreate: 'call/create',
+  callStart: 'call/start',
+  callStatus: 'call/status',
+  checkAccessToken: 'check/access-token',
+  checkContinue: 'check/continue',
+  checkIdentification: 'check/identification-details',
+  checkFaceIdentification: 'check/faceidentification-details',
+  clientDetails: 'form/client-details',
+  companyRepresentation: 'company-representation',
+  completion: 'completion',
+  documentSignConfirm: 'sign/sms-sign',
+  documentSignData: 'sign/sign-data',
+  documentSmsSign: 'sign/sms-send',
+  eIdLoginCreationLegal: 'kyb-identification/eid-creation',
+  eIdLoginVerificationLegal: 'kyb-identification/eid-verification',
+  externalFileUpload: 'media/external-file',
+  fileUpload: 'form/files',
+  getFaceTecLicense: 'facetec/license',
+  getFaceTecToken: 'facetec/session-token',
+  getFormData: 'form/data',
+  identificationComplete: 'identification/complete',
+  identificationStartOver: 'check/start-over',
+  identificationSubmit: 'submit',
+  identificationVerify: 'verify',
+  kybForms: 'kyb-forms',
+  loginCodeSend: 'auth/verification-code-send',
+  loginCodeVerify: 'auth/verify-code',
+  mobileIdLoginLegal: 'kyb-identification/mobile-id',
+  officialsRegistry: 'kybregistryhub/officials',
+  omnichannel: 'omnichannel', // post: hearbeat start/restart, put: hearbeat set, get: check hearbeat
+  omnichannelSms: 'omnichannel/sms',
+  omnichannelContinue: 'omnichannel/identification-continue',
+  omnichannelShortUrl: 'omnichannel/short-url',
+  permissionsContinue: 'omnichannel/identification-permissions-continue',
+  permissionsRedirect: 'omnichannel/identification-permissions-redirect',
+  passiveFaceValidation: 'passive-face-validation',
+  pdfSignature: 'auth/pdf-signature',
+  pdfSignatureStatus: 'auth/pdf-signature-status',
+
+  poaUpload: 'media/proof-of-address',
+  recordStart: 'record/start',
+  settings: 'settings',
+  signatureAuthenticationMobileId: 'signatureauthentication/mobileid',
+  signatureAuthenticationSmartId: 'signatureauthentication/smartid',
+  signatureCreate: 'auth/signature-create',
+  signatureStatus: 'auth/signature-sign',
+  signStartIdentification: 'sign-start',
+  smartIdLoginLegal: 'kyb-identification/smart-id',
+  startAccessCodes: 'access-codes',
+  startAccessTokens: 'access-tokens',
+  startFaceAccessCodes: 'faceauthentication/access-codes',
+  startFaceAccessTokens: 'faceauthentication/access-tokens',
+  startFaceAuthentication: 'faceauthentication/start',
+  startIdentification: 'start',
+  startSignatureAuthentication: 'signatureauthentication/start',
+  updateForm: 'form/update',
+  validateDocument: 'upload-document',
+  validateFace: 'upload-face',
+  validateFaceAuthentication: 'faceauthentication/upload-face'
+}

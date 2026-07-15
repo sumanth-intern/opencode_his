@@ -1,0 +1,76 @@
+export const CANVAS_MASK_Y_POSITION_OFFSET = 20
+export const JPEG_QUALITY = 0.92
+export const JPEG_SHARPEN_VALUE = 1
+export const IMAGE_RESIZE_STEP = 0.125
+export const PASSIVE_LIVENESS_IMAGE_HEIGHT = 720
+export const MAX_API_RETRY_COUNT = 10
+export const MIN_API_DELAY = 1000
+export const MAX_API_DELAY = 64000
+export const OMNICHANNEL_DELAY = 5000
+export const MIN_AUDIT_TRAIL_COUNT = 2
+
+export const ID_CHECK_LOADER = Object.freeze({
+  VIDEO_MESSAGE_OFFSET: 0.6185,
+  VIDEO_CURRENTTIME_START_OFFSET: 0.5,
+  CANVAS_GREEN_LINE_OFFSET: 1,
+  APPROVE_REDIRECT_DELAY: 5000,
+  SUCCESS_VIDEO_PLAYBACK_RATE: 3
+})
+
+export const STORE_KEYS = Object.freeze({
+  OMNICHANNELS: 'oc',
+  TOKENS: 'ct',
+  FACE_AUTHENTICATION_ID: 'faId',
+  QUERY: 'q'
+})
+
+export const API_METHODS = Object.freeze({
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  DELETE: 'DELETE'
+})
+
+export const PAGE_NAMES = Object.freeze({
+  HOME: 'Home',
+  OMNICHANNEL: 'Omnichannel',
+  OMNICHANNEL_COMPLETED: 'OmnichannelCompleted'
+})
+
+export const OMNICHANNEL_STATUSES = Object.freeze({
+  UNAVAILABLE: 'Unavailable',
+  AVAILABLE: 'Available',
+  INACTIVE: 'Inactive',
+  ACTIVE: 'Active',
+  COMPLETED: 'Completed'
+})
+
+export const CLAIMS = Object.freeze({
+  FACE_AUTHENTICATION: 'faceauthentication',
+  OMNICHANNEL: 'omnichannel'
+})
+
+export const API_ERRORS = Object.freeze({
+  NO_METHOD: 'NoMethod',
+  MAX_RETRY_COUNT: 'MaxRetryCount',
+  ABORT_ERROR: 'AbortError',
+  UNAUTHORIZED: 'Unauthorized'
+})
+
+export const IDV_STATUS = Object.freeze({
+  PENDING: 'pending',
+  COMPLETE: 'completed',
+  FAILED: 'failed',
+  APPROVED: 'APPROVED'
+})
+
+export const LOADER_VIDEO_RESPONSE_TYPES = Object.freeze({
+  SUCCESS: 'success',
+  ERROR: 'error'
+})
+
+export const LINK_ALTERNATIVES = Object.freeze({
+  QR: 'QR',
+  SMS: 'SMS',
+  MANUAL: 'MANUAL'
+})

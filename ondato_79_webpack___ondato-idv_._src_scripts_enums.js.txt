@@ -1,0 +1,287 @@
+const popUpTypesEnum = {
+  name: 'popUpTypes',
+  enum: {
+    unauthorized: 401,
+    noCamera: 'NoCamera',
+    noPermissions: 'NoPermissions',
+    mobileUnsupported: 'MobileUnsupported',
+    instructions: 'Instructions',
+    noCall: 'NoCall',
+    SmsSuccess: 'SmsSuccess',
+    CloseIdvProcess: 'CloseIdvProcess'
+  }
+}
+
+const errorResourcesEnum = {
+  name: 'errorResources',
+  enum: {
+    401: 'TimeOut',
+    NoCamera: 'NoCamera',
+    MobileUnsupported: 'MobileUnsupported'
+  }
+}
+
+const mediaSourceTypesEnum = {
+  name: 'mediaSourceTypes',
+  enum: {
+    video: 'Video',
+    photo: 'Photo',
+    call: 'Call'
+  }
+}
+
+const fileSourceTypesEnum = {
+  name: 'fileSourceTypes',
+  enum: {
+    videoTaken: 'VideoTaken',
+    photoTaken: 'PhotoTaken',
+    photoUploaded: 'PhotoUploaded'
+  }
+}
+
+const infoModeTypesEnum = {
+  name: 'infoModeTypes',
+  enum: {
+    faceVideo: 'FaceVideo',
+    facePhoto: 'FacePhoto',
+    passportFront: 'PassportFront',
+    passportBack: 'PassportBack',
+    idCardFront: 'IdCardFront',
+    idCardBack: 'IdCardBack',
+    driverLicenseFront: 'DriverLicenseFront',
+    driverLicenseBack: 'DriverLicenseBack',
+    stop: 'Stop'
+  }
+}
+
+const pageTypesEnum = {
+  name: 'pageTypes',
+  enum: {
+    front: 'Front',
+    back: 'Back'
+  }
+}
+
+const documentTypesEnum = {
+  name: 'documentTypes',
+  enum: {
+    passport: 'Passport',
+    'id-card': 'IdentityCard',
+    'driver-license': 'DriverLicense'
+  }
+}
+const cameraStatesEnum = {
+  name: 'cameraStates',
+  enum: {
+    pending: 'Pending',
+    ok: 'Ok',
+    failed: 'Failed',
+    active: 'Active',
+    loading: 'Loading'
+  }
+}
+
+const resourceTypesEnum = {
+  name: 'resourceTypes',
+  enum: {
+    face: 'Face'
+  }
+}
+
+const errorTypesEnum = {
+  name: 'errorTypes',
+  enum: {
+    unauthorized: 'Unauthorized',
+    noCamera: 'NoCamera',
+    noPermissions: 'NoPermissions',
+    cameraStreamInactive: 'CameraStreamInactive',
+    noNetwork: 'NoNetwork',
+
+    // invalidToken: 'InvalidToken',
+    // lockedOut: 'LockedOut',
+    // licenseExpired: 'LicenseExpired',
+    invalidToken: 'Failed',
+    invalidIpAddress: 'InvalidIpAddress',
+    lockedOut: 'Failed',
+    licenseExpired: 'Failed',
+
+    termsAndConditions: 'TermsAndConditions',
+    cantRepresent: 'CantRepresent',
+
+    notFound: 'Failed',
+    forbidden: 'Failed',
+    noCompany: 'Failed',
+    noRequiredElements: 'Failed',
+    failed: 'Failed',
+
+    screenRecord: 'ScreenRecord'
+  }
+}
+
+const orientationTypesEnum = {
+  name: 'orientationTypes',
+  enum: {
+    landscape: 1,
+    portrait: 2
+  }
+}
+
+const ruleTypesEnum = {
+  name: 'ruleTypes',
+  enum: {
+    termsAndConditions: 'TermsAndConditions',
+    cameraDisabled: 'CameraDisabled',
+    omnichannelDisabled: 'OmnichannelDisabled',
+    customTranslations: 'CustomTranslations',
+    livenessCheckDisabled: 'LivenessCheckDisabled',
+    passiveLiveness: 'PassiveLiveness',
+    customStyles: 'CustomStyles',
+    customFavicon: 'CustomFavicon',
+    screenRecord: 'ScreenRecord',
+    smartId: 'SmartId',
+    mobileId: 'MobileId',
+    appStoreEnabled: 'AppStoreEnabled',
+    ageVerification: 'AgeVerification'
+  }
+}
+
+const faceCheckTypesEnum = {
+  name: 'faceCheckTypes',
+  enum: {
+    liveness: 'LIVENESS',
+    passive: 'PASSIVE'
+  }
+}
+
+const enumHandler = {
+  get(target, key) {
+    if (typeof key === 'symbol' || key === '_isVue') return target.enum
+    if (key === 'values') return Object.values(target.enum)
+    if (target.enum[key]) return target.enum[key]
+    throw `No key: ${key} in ${target.name}.`
+  },
+
+  set(target, key) {
+    throw `Can't edit ${target.name}. Key: ${key}.`
+  }
+}
+
+export const popUpTypes = new Proxy(popUpTypesEnum, enumHandler)
+export const pageTypes = new Proxy(pageTypesEnum, enumHandler)
+export const mediaSourceTypes = new Proxy(mediaSourceTypesEnum, enumHandler)
+export const errorResources = new Proxy(errorResourcesEnum, enumHandler)
+export const documentTypes = new Proxy(documentTypesEnum, enumHandler)
+export const fileSourceTypes = new Proxy(fileSourceTypesEnum, enumHandler)
+export const infoModeTypes = new Proxy(infoModeTypesEnum, enumHandler)
+export const cameraStates = new Proxy(cameraStatesEnum, enumHandler)
+export const resourceTypes = new Proxy(resourceTypesEnum, enumHandler)
+export const errorTypes = new Proxy(errorTypesEnum, enumHandler)
+export const orientationTypes = new Proxy(orientationTypesEnum, enumHandler)
+export const ruleTypes = new Proxy(ruleTypesEnum, enumHandler)
+export const faceCheckTypes = new Proxy(faceCheckTypesEnum, enumHandler)
+
+export const OmnichannelFailReason = Object.freeze({
+  OmnichannelSmsLimitReached: 'OmnichannelSmsLimitReached',
+  // Sms is sent more often than once per 60s
+  OmnichannelSmsCreatedTimeSpanException:
+    'OmnichannelSmsCreatedTimeSpanException'
+})
+
+export const idCheckLoaderStatuses = Object.freeze({
+  success: 'success',
+  error: 'error',
+  completed: 'completed'
+})
+
+export const loginMethods = Object.freeze({
+  smartIdLoginCreationPrivate: 'smart-id-login-creation-private',
+  smartIdLoginVerificationPrivate: 'smart-id-login-verification-private',
+  mobileIdLoginCreationPrivate: 'mobile-id-login-creation-private',
+  mobileIdLoginVerificationPrivate: 'mobile-id-login-verification-private',
+  smartIdLoginCreationLegal: 'smart-id-login-creation-legal',
+  smartIdLoginVerificationLegal: 'smart-id-login-verification-legal',
+  mobileIdLoginCreationLegal: 'mobile-id-login-creation-legal',
+  mobileIdLoginVerificationLegal: 'mobile-id-login-verification-legal',
+  eIdLoginCreationLegal: 'e-id-login-creation-legal',
+  eIdLoginVerificationLegal: 'e-id-login-verification-legal',
+  smsLoginCreation: 'sms-login-creation',
+  smsLoginVerification: 'sms-login-verification',
+  alternativeLogin: 'alternative-login-veritication'
+})
+
+export const loginErrors = Object.freeze({
+  userRefused: 'USER_REFUSED',
+  timeout: 'TIMEOUT',
+  technicalError: 'TECHNICAL_ERROR',
+  documentUnusable: 'DOCUMENT_UNUSABLE',
+  deliveryError: 'DELIVERY_ERROR',
+  phoneAbsent: 'PHONE_ABSENT',
+  notMidClient: 'NOT_MID_CLIENT',
+  simError: 'SIM_ERROR'
+})
+
+export const apiProxyMethods = Object.freeze({
+  getPdfSignatureStatus: 'api-get-pdf-signature-status'
+})
+
+export const kybMethods = Object.freeze({
+  kybForms: 'kyb-forms'
+})
+
+export const fileMethods = Object.freeze({
+  fileUpload: 'file-upload'
+})
+
+export const formDataMethods = Object.freeze({
+  getFormData: 'get-form-data'
+})
+
+export const appPages = Object.freeze({
+  home: 'Home',
+  documentSelect: 'DocumentSelect',
+  documentInstructionsFront: 'DocumentInstructionsFront',
+  documentInstructionsBack: 'DocumentInstructionsBack',
+  documentFront: 'DocumentFront',
+  documentBack: 'DocumentBack',
+  face: 'Face',
+  faceAuthentication: 'FaceAuthentication',
+  omnichannel: 'Omnichannel',
+  omnichannelCompleted: 'OmnichannelCompleted',
+  omnichannelQR: 'OmnichannelQR'
+})
+
+export const ruleList = Object.freeze({
+  biometricAgeThresholdComparison: 'BIOMETRIC_AGE_THRESHOLD_COMPARISON'
+})
+
+export const ruleStatusList = Object.freeze({
+  success: 'SUCCESS',
+  fail: 'FAIL',
+  unavailable: 'UNAVAILABLE'
+})
+
+export const deadEndReasons = Object.freeze([
+  'SANCTIONED',
+  'POSSIBLE_FRAUD_ATTEMPT',
+  'MISCELLANEOUS',
+  'PROHIBITED_COUNTRY_OR_STATE',
+  'PROHIBITED_IP_COUNTRY',
+  'HIGH_RISK_COUNTRY',
+  'UNDERAGE_PERSON',
+  'PROHIBITED_NATIONALITY',
+  'DUPLICATED_INFO',
+  'DOC_AND_BIO_AGE_DOESNT_MATCH',
+  'DOCUMENT_MANIPULATION',
+  'KNOWN_FRAUDSTER',
+  'POLITICALLY_EXPOSED_PERSON',
+  'ADVERSE_MEDIA_FOUND'
+])
+
+export const cameraReadyStates = Object.freeze({
+  live: 'live',
+  ended: 'ended'
+})
+
+export const signMethodType = Object.freeze({
+  eIdCard: 'E_ID_CARD'
+})

@@ -1,0 +1,552 @@
+import { activityLogger } from '@src/scripts/activityLogger'
+import { cameraReadyStates, errorTypes } from '@src/scripts/enums'
+import { popUp } from '@src/components/popUp'
+
+export default class {
+  state = {
+    isReady: false,
+    isAndroidPortrait: false,
+    requiredAudio: false,
+    cameraConstraints: null,
+    browserData: null,
+    parentId: null,
+    videoId: null,
+    tracks: null,
+    deviceDetails: null,
+    cameraDevices: null,
+    selectedCamera: 0,
+    changeAvailable: false,
+    requiredChange: false
+  }
+
+  constraints = {
+    desktop: [
+      {
+        audio: false,
+        video: { width: { exact: 1920 }, height: { exact: 1080 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 1280 }, height: { exact: 720 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 640 }, height: { exact: 360 } }
+      },
+      { audio: false, video: { width: { exact: 640 }, height: { exact: 480 } } }
+    ],
+    ios: [
+      {
+        audio: false,
+        video: { width: { exact: 1920 }, height: { exact: 1080 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 1280 }, height: { exact: 720 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 640 }, height: { exact: 360 } }
+      },
+      { audio: false, video: { width: { exact: 640 }, height: { exact: 480 } } }
+    ],
+    androidPortrait: [
+      {
+        audio: false,
+        video: { width: { exact: 1920 }, height: { exact: 1080 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 1280 }, height: { exact: 720 } }
+      },
+      {
+        audio: false,
+        video: { width: { exact: 640 }, height: { exact: 360 } }
+      },
+      { audio: false, video: {} }
+    ],
+    androidLandscape: [{ audio: false, video: {} }],
+    androidJ7: [{ audio: false, video: { width: { exact: 1920 } } }]
+  }
+
+  // public
+  constructor({
+    browserData,
+    parentId,
+    videoId,
+    backCameraRequired,
+    requiredAudio,
+    requiredChange
+  }) {
+    if (!browserData || !videoId) throw { type: errorTypes.noRequiredElements }
+
+    this.state.browserData = browserData
+    this.state.parentId = parentId
+    this.state.videoId = videoId
+    this.state.requiredAudio = !!requiredAudio
+    this.state.requiredChange = requiredChange
+
+    if (browserData.isMobileDevice && backCameraRequired) {
+      this.state.selectedCamera = 1
+    }
+
+    this.setCameraConstraints(browserData)
+  }
+
+  async initCamera() {
+    await this.loadCameraDevices()
+    const { error, tracks } = await this.startCamera()
+    if (tracks) return tracks
+
+    if (error) {
+      activityLogger.logActivity('INACTIVE_CAMERA_SOURCE')
+      popUp(errorTypes.cameraStreamInactive)
+      throw error
+    } else {
+      this.showPermissionsError()
+    }
+  }
+
+  async changeCamera() {
+    const { state } = this
+    const { cameraDevices } = state.deviceDetails
+
+    this.stopCamera()
+
+    if (state.selectedCamera < cameraDevices.length - 1) {
+      state.selectedCamera++
+    } else {
+      state.selectedCamera = 0
+    }
+
+    const { error, tracks } = await this.startCamera()
+    if (tracks) return tracks
+
+    if (error) {
+      activityLogger.logActivity('INACTIVE_CAMERA_SOURCE')
+      popUp(errorTypes.cameraStreamInactive)
+      throw error
+    } else {
+      this.showPermissionsError()
+    }
+  }
+
+  stopCamera() {
+    const { state } = this
+    state.isReady = false
+
+    if (state.tracks) {
+      if (state.tracks.videoTrack) {
+        state.tracks.videoTrack.stop()
+        state.tracks.videoTrack = null
+      }
+      if (state.tracks.audioTrack) {
+        state.tracks.audioTrack.stop()
+        state.tracks.audioTrack = null
+      }
+      state.tracks = null
+    }
+
+    const video = document.getElementById(state.videoId)
+    if (video) {
+      video.srcObject = null
+    }
+  }
+
+  // private
+  async loadCameraDevices() {
+    const { state } = this
+    const options = {
+      video: true,
+      audio: state.requiredAudio
+    }
+
+    state.deviceDetails = await this.deviceInit(options)
+    this.validateMediaDetails(state.deviceDetails, options)
+
+    const { requiredChange, browserData } = state
+    if (
+      state.deviceDetails.cameraDevices.length > 1 &&
+      (requiredChange || !browserData.isMobileDevice)
+    ) {
+      state.changeAvailable = true
+    }
+  }
+
+  validateMediaDetails(details, { video, audio }) {
+    if ((video && !details.hasCamera) || (audio && !details.hasMicrophone)) {
+      popUp(errorTypes.noCamera)
+      activityLogger.logActivity('CAMERA_NOT_FOUND')
+      throw { type: errorTypes.noCamera }
+    } else {
+      activityLogger.logActivity('CAMERA_FOUND')
+    }
+
+    if (!details.isSupported) return
+
+    if (
+      (video && !details.hasCameraPermissions) ||
+      (audio && !details.hasMicrophonePermissions)
+    ) {
+      this.showPermissionsError()
+    }
+  }
+
+  async startCamera() {
+    const {
+      deviceDetails,
+      selectedCamera,
+      cameraConstraints,
+      requiredAudio,
+      browserData
+    } = this.state
+
+    if (!deviceDetails || !deviceDetails.hasCamera)
+      return { error: { type: errorTypes.noCamera } }
+
+    let settings
+    if (deviceDetails.isSupported) {
+      const cameraDevice = deviceDetails.cameraDevices[selectedCamera]
+      if (!cameraDevice) return { error: { type: errorTypes.noCamera } }
+
+      settings = cameraDevice
+    } else {
+      settings = {}
+
+      if (browserData.isMobileDevice) {
+        settings.facingMode = {
+          exact: selectedCamera === 0 ? 'user' : 'environment'
+        }
+      }
+    }
+
+    let error
+
+    for (const cameraSettings of cameraConstraints) {
+      cameraSettings.audio = requiredAudio
+      cameraSettings.video.deviceId = settings.deviceId
+      cameraSettings.video.facingMode = settings.facingMode
+
+      const result = await this.getUserMediaInit(cameraSettings)
+
+      if (result) {
+        if (result.tracks) return { tracks: result.tracks }
+        else if (result.error) error = result.error
+      }
+    }
+
+    return { error }
+  }
+
+  async deviceInit(options) {
+    const details = {
+      isSupported: false,
+      hasCamera: false,
+      hasMicrophone: false,
+      hasCameraPermissions: false,
+      hasMicrophonePermissions: false,
+      cameraDevices: null
+    }
+
+    if (!options) return details
+
+    await this.mediaDetailsCheck(details, options)
+
+    if (!details.isSupported) return details
+
+    if (
+      (options.video && !details.hasCameraPermissions) ||
+      (options.audio && !details.hasMicrophonePermissions)
+    ) {
+      if (await this.getMediaPermissions(options)) {
+        await this.mediaDetailsCheck(details, options)
+      }
+    }
+
+    this.mapCameraDevices(details)
+    return details
+  }
+
+  showPermissionsError() {
+    activityLogger.logActivity('NO_CAMERA_PERMISSIONS')
+    popUp(errorTypes.noPermissions)
+    throw { type: errorTypes.noPermissions }
+  }
+
+  async mediaDetailsCheck(target, options) {
+    const mediaDevices = await navigator.mediaDevices.enumerateDevices()
+    if (!mediaDevices?.length) return
+
+    target.isSupported = this.validateBrowser()
+    if (options.video) this.mapCameraDetails(target, mediaDevices)
+    if (options.audio) this.mapAudioDetails(target, mediaDevices)
+  }
+
+  async getMediaPermissions(options) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(options)
+      if (!stream) return false
+
+      if (options.video) stream.getVideoTracks()[0].stop()
+      if (options.audio) stream.getAudioTracks()[0].stop()
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  async getUserMediaInit(cameraSettings) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(cameraSettings)
+      if (!stream) return
+
+      const tracks = await this.getUserMediaSuccess(stream)
+      if (tracks) return { tracks }
+    } catch (error) {
+      if (
+        error === errorTypes.cameraStreamInactive ||
+        (error &&
+          (error.name === 'AbortError' || error.name === 'NotReadableError'))
+      ) {
+        return { error: { type: errorTypes.cameraStreamInactive } }
+      }
+    }
+  }
+
+  setTrackEndListener(track) {
+    track.onended = () => {
+      if (track.readyState === cameraReadyStates.ended) {
+        this.showPermissionsError()
+      }
+    }
+    track.onmute = () => {
+      if (track.muted) {
+        this.showPermissionsError()
+      }
+    }
+  }
+
+  getUserMediaSuccess(stream) {
+    this.state.isReady = true
+
+    return new Promise((resolve, reject) => {
+      const video = document.getElementById(this.state.videoId)
+      const videoTrack = stream.getVideoTracks()[0]
+      const audioTrack = stream.getAudioTracks()[0]
+
+      video.srcObject = stream
+
+      video.onemptied = () => {
+        if (this.state.isReady) return
+
+        videoTrack?.stop()
+        audioTrack?.stop()
+      }
+
+      video.onloadeddata = () => {
+        if (!this.state.isReady) {
+          return reject()
+        }
+
+        if (!stream.active) {
+          videoTrack.stop()
+          if (audioTrack) audioTrack.stop()
+          return reject(errorTypes.cameraStreamInactive)
+        }
+        const aspectRatio = video.videoHeight / video.videoWidth
+
+        if (aspectRatio < 1 && this.state.isAndroidPortrait) {
+          videoTrack.stop()
+          if (audioTrack) audioTrack.stop()
+          return reject()
+        }
+
+        this.cameraLoaded(video)
+        this.state.tracks = {
+          videoTrack,
+          audioTrack
+        }
+
+        if (videoTrack) this.setTrackEndListener(videoTrack)
+        if (audioTrack) this.setTrackEndListener(audioTrack)
+
+        resolve(this.state.tracks)
+      }
+    })
+  }
+
+  cameraLoaded(video) {
+    activityLogger.logActivity('CAMERA_STARTED')
+    const userAgent = (navigator && navigator.userAgent) || ''
+
+    const { browserData, selectedCamera } = this.state
+
+    if (browserData.isMobileDevice) {
+      const isBack = selectedCamera === 1
+
+      const isLenovo = userAgent.includes('Lenovo YT3-850F')
+      if (isBack) {
+        if (isLenovo) video.style.transform = null
+        else video.style.transform = 'none'
+      } else {
+        if (isLenovo) video.style.transform = 'none'
+        else video.style.transform = null
+      }
+    }
+
+    this.setCameraSize(video)
+
+    video.play()
+  }
+
+  setCameraSize(video) {
+    if (!this.state.parentId) return
+
+    const parent = document.getElementById(this.state.parentId)
+    const cameraBox = video.parentElement
+    if (parent === cameraBox) return
+
+    const parentAspectRatio = parent.clientWidth / parent.clientHeight
+    const videoAspectRatio = video.videoWidth / video.videoHeight
+
+    const { isIOS } = this.state.browserData
+    if (parentAspectRatio <= videoAspectRatio || isIOS) {
+      video.style.height = '100%'
+      cameraBox.style.height = '100%'
+    } else {
+      video.style.width = '100%'
+      cameraBox.style.width = '100%'
+    }
+  }
+
+  setCameraConstraints(browserData) {
+    if (!browserData.isMobileDevice) {
+      this.state.cameraConstraints = this.constraints.desktop
+    } else if (browserData.isIOS) {
+      this.state.cameraConstraints = this.constraints.ios
+    }
+    if (browserData.isAndroid) {
+      if (screen.width >= screen.height) {
+        this.state.cameraConstraints = this.constraints.androidLandscape
+      } else if (screen.width < screen.height) {
+        this.state.isAndroidPortrait = true
+        this.state.cameraConstraints = this.constraints.androidPortrait
+      }
+
+      if (
+        navigator &&
+        navigator.userAgent &&
+        navigator.userAgent.includes('SM-J727T1')
+      ) {
+        this.state.cameraConstraints = this.constraints.androidJ7
+      }
+    } else {
+      this.state.cameraConstraints = this.constraints.desktop
+    }
+  }
+
+  validateBrowser() {
+    const { DetectRTC } = this.state.browserData
+    if (!DetectRTC || !DetectRTC.browser) return false
+
+    const { isChrome, isSafari, isSamsung } = DetectRTC.browser
+
+    if (isChrome || isSafari || isSamsung) {
+      return true
+    }
+
+    return false
+  }
+
+  mapCameraDetails(target, mediaDevices) {
+    const devices = mediaDevices
+      .filter((item) => item.kind === 'videoinput')
+      .map((item) => ({ label: item.label, deviceId: item.deviceId }))
+
+    if (devices?.length) {
+      target.hasCamera = true
+      target.cameraDevices = devices
+
+      if (devices[0].label) {
+        target.hasCameraPermissions = true
+      }
+    } else {
+      target.cameraDevices = []
+    }
+  }
+
+  mapAudioDetails(target, mediaDevices) {
+    const device = mediaDevices.find((item) => item.kind === 'audioinput')
+
+    if (device) {
+      target.hasMicrophone = true
+      target.hasMicrophonePermissions = !!device.label
+    }
+  }
+
+  mapCameraDevices(details) {
+    const { isAndroid, isIOS } = this.state.browserData
+
+    if (isAndroid) {
+      details.cameraDevices.sort((a, b) => (a.label > b.label ? 1 : -1))
+      const frontCamera = this.getDeviceIdSettings(
+        details.cameraDevices,
+        'front'
+      )
+      const backCamera = this.getDeviceIdSettings(details.cameraDevices, 'back')
+
+      details.cameraDevices = [frontCamera, backCamera]
+    } else if (isIOS) {
+      const frontCamera = this.getFacingModeSettings(details.cameraDevices, 0)
+      const backCamera = this.getFacingModeSettings(details.cameraDevices, 1)
+
+      details.cameraDevices = [frontCamera, backCamera]
+    } else {
+      details.cameraDevices = this.mapDeviceIdSettings(details.cameraDevices)
+    }
+  }
+
+  getDeviceIdSettings(devices, type) {
+    const camera = devices.find((item) =>
+      item.label.toLowerCase().includes(type)
+    )
+
+    if (camera) {
+      return {
+        deviceId: {
+          exact: camera.deviceId
+        }
+      }
+    }
+
+    return null
+  }
+
+  getFacingModeSettings(devices, index) {
+    const camera = devices[index]
+
+    if (camera) {
+      return {
+        facingMode: {
+          exact: index === 0 ? 'user' : 'environment'
+        }
+      }
+    }
+
+    return null
+  }
+
+  mapDeviceIdSettings(devices) {
+    const settings = []
+
+    for (const camera of devices) {
+      settings.push({
+        deviceId: {
+          exact: camera.deviceId
+        }
+      })
+    }
+
+    return settings
+  }
+}

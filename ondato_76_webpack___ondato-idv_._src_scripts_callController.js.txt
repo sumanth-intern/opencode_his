@@ -1,0 +1,394 @@
+import Twilio from 'twilio-video'
+import CameraController from '@src/scripts/cameraController'
+import { errorTypes, mediaSourceTypes } from '@src/scripts/enums'
+import Api, { call } from '@src/scripts/api'
+import { getConnectionId } from '@src/scripts/realTimeApi'
+
+const ParticipantType = Object.freeze({
+  REMOTE: 'Remote',
+  LOCAL: 'Local'
+})
+
+let self = null
+
+export default class {
+  get mode() {
+    return mediaSourceTypes.call
+  }
+
+  callback = {
+    makeCallSuccess: null,
+    errorOccured: null,
+    captureCompleted: null,
+    callEnded: null
+  }
+
+  state = {
+    parentId: null,
+    maskId: null,
+    videoId: null,
+    browserData: null,
+    room: null,
+    tracks: null,
+    cameraController: null,
+    changeAvailable: false
+  }
+
+  constructor() {
+    self = this
+
+    this.handleRemoteParticipantConnected = this.handleRemoteParticipantConnected.bind(
+      this
+    )
+    this.handleRemoteParticipantDisconnected = this.handleRemoteParticipantDisconnected.bind()
+    this.handleLocalParticipantDisconnected = this.handleLocalParticipantDisconnected.bind(
+      this
+    )
+    this.handleTrackSubscribed = this.handleTrackSubscribed.bind(this)
+    this.handleTrackUnsubscribed = this.handleTrackUnsubscribed.bind(this)
+  }
+
+  // ---------- Logging ----------
+  getRoomMetadata({ participant, participantType }) {
+    const generalMetadata = {
+      roomSid: this.state.room?.sid ?? 'N/A',
+      application: 'kyc-v1'
+    }
+
+    if (participant) {
+      return {
+        participant: participant.identity,
+        participantType,
+        ...generalMetadata
+      }
+    }
+
+    const localParticipant = this.state.room?.localParticipant
+    if (localParticipant) {
+      return {
+        participant: localParticipant.identity,
+        participantType: ParticipantType.LOCAL,
+        ...generalMetadata
+      }
+    }
+
+    return {
+      participant: 'N/A',
+      participantType: 'N/A',
+      ...generalMetadata
+    }
+  }
+
+  // Public
+  async init(params) {
+    this.validateRequired(params)
+    try {
+      await this.initCamera()
+      return true
+    } catch (error) {
+      console.error(error)
+      return false
+    }
+  }
+
+  //Private
+  validateRequired({ parentId, maskId, videoId, browserData }) {
+    if (!parentId || !maskId || !videoId)
+      throw { type: errorTypes.noRequiredElements }
+
+    this.state.parentId = parentId
+    this.state.maskId = maskId
+    this.state.videoId = videoId
+    this.state.browserData = browserData
+  }
+
+  cancel() {
+    const { state } = this
+    state.tracks = null
+
+    if (state.cameraController) {
+      state.cameraController.stopCamera()
+      state.cameraController = null
+    }
+
+    this.finishCall()
+  }
+
+  finishCall() {
+    const { room } = this.state
+    if (room) {
+      room.disconnect()
+      this.closeRoom(room.sid)
+    }
+  }
+
+  async closeRoom(roomId) {
+    try {
+      await call(`call/room/${roomId}/complete`)
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  async callStatus() {
+    try {
+      const { data } = await call(Api.callStatus)
+      return data
+    } catch (error) {
+      if (this.callback.errorOccured) this.callback.errorOccured()
+      return null
+    }
+  }
+
+  // ---------- Call Initiation Workflow ----------
+  makeCall() {
+    this.createCallSession()
+  }
+
+  createCallSession() {
+    setTimeout(async () => {
+      const { data, error } = await this.createCallSessionInApi()
+      if (error) {
+        return
+      }
+      if (!data) return this.createCallSession()
+
+      this.startCall(data.sessionId)
+    }, 1000)
+  }
+
+  startCall(sessionId) {
+    setTimeout(async () => {
+      const { data, error } = await this.startCallInApi(sessionId)
+      if (error) {
+        return
+      }
+      if (!data) return this.startCall(sessionId)
+
+      this.connectLocalParticipantToRoom(data)
+    }, 1000)
+  }
+
+  async connectLocalParticipantToRoom(callDetails) {
+    const conectionSettings = {
+      name: callDetails.room,
+      audio: false,
+      video: false
+    }
+
+    try {
+      const room = await Twilio.connect(callDetails.token, conectionSettings)
+      await this.setupRoomEventHandlers(room)
+    } catch (error) {
+      console.error(error)
+      if (this.callback.errorOccured) this.callback.errorOccured()
+    }
+  }
+
+  async setupRoomEventHandlers(room) {
+    const {
+      state: { tracks }
+    } = this
+    const { localParticipant } = room
+    this.state.room = room
+
+    // Events with actual handlers
+    room.on('disconnected', this.handleLocalParticipantDisconnected)
+    room.participants.forEach(this.handleRemoteParticipantConnected, this)
+    room.on('participantConnected', this.handleRemoteParticipantConnected)
+    room.on('participantDisconnected', this.handleRemoteParticipantDisconnected)
+
+    await this.publishLocalMediaTracks(localParticipant, tracks)
+  }
+
+  // ---------- Local Participant Events ----------
+  async handleLocalParticipantDisconnected(room) {
+    console.log('disconnected')
+
+    const data = await this.callStatus()
+    this.callback.captureCompleted?.()
+    this.callback.callEnded?.(data)
+
+    room.localParticipant.tracks.forEach((publication) => {
+      const attachedElements = publication.track.detach()
+      attachedElements.forEach((element) => element.remove())
+    })
+
+    this.state.room = null
+  }
+
+  // ---------- Remote Participant Events ----------
+  handleRemoteParticipantConnected(participant) {
+    console.log('participantConnected', this.state.room.sid)
+
+    participant.on('trackSubscribed', this.handleTrackSubscribed)
+    participant.on('trackUnsubscribed', this.handleTrackUnsubscribed)
+
+    participant.tracks.forEach((publication) => {
+      if (publication.isSubscribed) {
+        this.handleTrackSubscribed(publication.track)
+      }
+    })
+
+    if (this.callback.makeCallSuccess) this.callback.makeCallSuccess()
+  }
+
+  handleRemoteParticipantDisconnected() {
+    console.log('participantDisconnected')
+    this.finishCall()
+  }
+
+  // ---------- Track Management ----------
+  async publishLocalMediaTracks(participant, tracks) {
+    const localTracks = await Twilio.createLocalTracks({
+      tracks: [tracks.videoTrack, tracks.audioTrack]
+    })
+
+    for (const mediaTrack of localTracks) {
+      participant.publishTrack(mediaTrack)
+    }
+  }
+
+  handleTrackSubscribed(track) {
+    console.log('trackSubscribed')
+
+    const { maskId } = this.state
+    const mask = document.getElementById(maskId)
+    mask.classList.add('participant-window')
+    mask.appendChild(track.attach())
+
+    track.once('started', (event) => this.maskUpdate(mask, event))
+  }
+
+  handleTrackUnsubscribed(track) {
+    console.log('trackUnsubscribed')
+
+    track.detach().forEach((element) => element.remove())
+    this.clearMask()
+  }
+
+  // ---------- Camera Management ----------
+  async initCamera() {
+    const { state } = this
+    state.cameraController = new CameraController({
+      browserData: state.browserData,
+      parentId: state.parentId,
+      videoId: state.videoId,
+      requiredAudio: true,
+      requiredChange: true
+    })
+
+    state.tracks = await state.cameraController.initCamera()
+    state.changeAvailable = state.cameraController.state.changeAvailable
+  }
+
+  async changeCamera() {
+    const { state } = this
+    const localParticipant = state.room.localParticipant
+
+    try {
+      const previousTracks = localParticipant.tracks.values()
+      for (const mediaTrack of previousTracks) {
+        localParticipant.unpublishTracks([mediaTrack.track])
+        mediaTrack.track.stop()
+      }
+
+      const tracks = await this.state.cameraController.changeCamera()
+      if (!tracks) return
+
+      await this.publishLocalMediaTracks(localParticipant, tracks)
+
+      state.tracks = tracks
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // ---------- Session Management ----------
+  async createCallSessionInApi() {
+    try {
+      const { data, error } = await call(Api.callCreate, {
+        connectionId: getConnectionId()
+      })
+
+      if (error) {
+        if (this.callback.errorOccured) this.callback.errorOccured()
+        return { error: true }
+      }
+      return { data }
+    } catch (error) {
+      if (this.callback.errorOccured) this.callback.errorOccured()
+      return { error: true }
+    }
+  }
+
+  async startCallInApi(sessionId) {
+    try {
+      const { data, error } = await call(Api.callStart, {
+        sessionId
+      })
+      if (error) {
+        if (this.callback.errorOccured) this.callback.errorOccured()
+        return { error: true }
+      }
+      return { data }
+    } catch (error) {
+      if (this.callback.errorOccured) this.callback.errorOccured()
+      return { error: true }
+    }
+  }
+
+  // ---------- Mask Management ----------
+  maskUpdate(mask, event) {
+    if (!event.dimensions) return
+    const dimensions = self.maskSize(event.dimensions)
+
+    mask.style.top = dimensions.top
+    mask.style.right = dimensions.right
+    mask.style.height = dimensions.height
+    mask.style.width = dimensions.width
+  }
+
+  maskSize(trackDimensions) {
+    const { parentId, videoId, browserData } = self.state
+
+    const parent = document.getElementById(parentId)
+    const video = document.getElementById(videoId)
+
+    let heightCoefficient =
+      parent.offsetHeight / parent.offsetWidth < 1 ? 0.2 : 0.15
+    const remoteAspectRatio = trackDimensions.height / trackDimensions.width
+
+    if (remoteAspectRatio > 1) {
+      heightCoefficient *= 2
+    }
+
+    const height = parent.offsetHeight * heightCoefficient
+    const size = {
+      height: `${height}px`,
+      width: `${height / remoteAspectRatio}px`
+    }
+
+    if (!browserData.isMobileDevice && browserData.browserName === 'firefox') {
+      size.top = `${
+        (video.offsetHeight - parent.offsetHeight) / 2 + 15 + video.offsetTop
+      }px`
+      size.right = `${
+        (video.offsetWidth - parent.offsetWidth) / 2 + 15 + video.offsetLeft
+      }px`
+    } else {
+      size.top = `${(video.offsetHeight - parent.offsetHeight) / 2 + 15}px`
+      size.right = `${(video.offsetWidth - parent.offsetWidth) / 2 + 15}px`
+    }
+
+    return size
+  }
+
+  clearMask() {
+    const { maskId } = self.state
+    const mask = document.getElementById(maskId)
+    mask.classList.remove('participant-window')
+    mask.innerHTML = ''
+  }
+}

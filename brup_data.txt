@@ -1,0 +1,98 @@
+GET /signin/identifier/challenge/failure HTTP/2
+Host: identityhomolog.acesso.io
+Cookie: _session_idp=s%3A4ugrvAHpNdb2F0vj99wS83YHyDrDc191.SUGrkn%2FdVtM3mkOhgqbSctmceA04Kr4VKfwkr1mgFwI; __cf_bm=wDtnYc_pztMuDOlG9n4uTeEWsnag17C8pUvwxbGbvFc-1781703896.819317-1.0.1.1-_ZPl6aGpubuctk22jZQYhbapLg.kafUxhCZ3VK_bJOmEIWQxHcZKFSoHvpApAnG_.ueyAEA2YAl2N49DaJ8lKlrk8QCrhExYttA9jhKNYLQGLpRF21kgTzoFYkiR4SAe
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Sec-Ch-Ua: "Microsoft Edge";v="149", "Chromium";v="149", "Not)A;Brand";v="24"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Referer: https://identityhomolog.acesso.io/signin/identifier/challenge?t=2cX4oJT6o8DAFRjnTwsFBm&service=6a1c72cd-a47e-4272-918b-16e56d312c0c&continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-US,en;q=0.9,en-IN;q=0.8,te;q=0.7
+Priority: u=0, i
+
+RESPONSE:
+
+HTTP/2 302 Found
+Date: Wed, 17 Jun 2026 13:48:01 GMT
+Content-Type: text/html; charset=utf-8
+Content-Security-Policy: default-src 'self' www.google.com https://storage.googleapis.com https://devcenter.unico.io;style-src 'self' 'unsafe-inline';script-src 'self' 'unsafe-inline' www.google.com www.gstatic.com;object-src 'none';img-src * 'self' data: https:;frame-ancestors 'none';upgrade-insecure-requests
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Strict-Transport-Security: max-age=15778476000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-Xss-Protection: 0
+Surrogate-Control: no-store
+Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+Expires: 0
+Content-Language: en-US
+Location: /signin/identifier/challenge/failure?service=6a1c72cd-a47e-4272-918b-16e56d312c0c&continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback
+Vary: Accept
+X-Request-Id: 51b7df18-6f21-4b18-b6b6-f2602092a41e
+Via: 1.1 google
+Alt-Svc: h3=":443"; ma=86400
+Speculation-Rules: "/cdn-cgi/speculation"
+Cf-Cache-Status: DYNAMIC
+Server: cloudflare
+Cf-Ray: a0d2826c6d035b98-MAA
+
+<p>Found. Redirecting to <a href="/signin/identifier/challenge/failure?service=6a1c72cd-a47e-4272-918b-16e56d312c0c&amp;continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback">/signin/identifier/challenge/failure?service=6a1c72cd-a47e-4272-918b-16e56d312c0c&amp;continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback</a></p>
+
+
+
+2.GET /signin/identifier/challenge/failure?service=6a1c72cd-a47e-4272-918b-16e56d312c0c&continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback HTTP/2
+Host: identityhomolog.acesso.io
+Cookie: _session_idp=s%3A4ugrvAHpNdb2F0vj99wS83YHyDrDc191.SUGrkn%2FdVtM3mkOhgqbSctmceA04Kr4VKfwkr1mgFwI; __cf_bm=wDtnYc_pztMuDOlG9n4uTeEWsnag17C8pUvwxbGbvFc-1781703896.819317-1.0.1.1-_ZPl6aGpubuctk22jZQYhbapLg.kafUxhCZ3VK_bJOmEIWQxHcZKFSoHvpApAnG_.ueyAEA2YAl2N49DaJ8lKlrk8QCrhExYttA9jhKNYLQGLpRF21kgTzoFYkiR4SAe
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Sec-Ch-Ua: "Microsoft Edge";v="149", "Chromium";v="149", "Not)A;Brand";v="24"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Referer: https://identityhomolog.acesso.io/signin/identifier/challenge?t=2cX4oJT6o8DAFRjnTwsFBm&service=6a1c72cd-a47e-4272-918b-16e56d312c0c&continue=https%3A%2F%2Fidentityhomolog.acesso.io%2Fauth%2Fidp%2Fcallback
+Accept-Encoding: gzip, deflate, br
+Accept-Language: en-US,en;q=0.9,en-IN;q=0.8,te;q=0.7
+Priority: u=0, i
+
+ RESPONSE:
+
+
+ HTTP/2 302 Found
+Date: Wed, 17 Jun 2026 13:48:02 GMT
+Content-Type: text/html; charset=utf-8
+Content-Security-Policy: default-src 'self' www.google.com https://storage.googleapis.com https://devcenter.unico.io;style-src 'self' 'unsafe-inline';script-src 'self' 'unsafe-inline' www.google.com www.gstatic.com;object-src 'none';img-src * 'self' data: https:;frame-ancestors 'none';upgrade-insecure-requests
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Strict-Transport-Security: max-age=15778476000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-Xss-Protection: 0
+Surrogate-Control: no-store
+Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+Expires: 0
+Content-Language: en-US
+Location: /signin/identifier/challenge?t=2cX4oJT6o8DAFRjnTwsFBm&service=6a1c72cd-a47e-4272-918b-16e56d312c0c&continue=https://identityhomolog.acesso.io/auth/idp/callback
+Vary: Accept
+X-Request-Id: 530468b9-2fb7-4c05-9713-220cb4aa9c7e
+Via: 1.1 google
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Speculation-Rules: "/cdn-cgi/speculation"
+Server: cloudflare
+Cf-Ray: a0d2826f4fc05b98-MAA
+
+<p>Found. Redirecting to <a href="/signin/identifier/challenge?t=2cX4oJT6o8DAFRjnTwsFBm&amp;service=6a1c72cd-a47e-4272-918b-16e56d312c0c&amp;continue=https://identityhomolog.acesso.io/auth/idp/callback">/signin/identifier/challenge?t=2cX4oJT6o8DAFRjnTwsFBm&amp;service=6a1c72cd-a47e-4272-918b-16e56d312c0c&amp;continue=https://identityhomolog.acesso.io/auth/idp/callback</a></p>

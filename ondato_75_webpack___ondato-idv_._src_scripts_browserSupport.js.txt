@@ -1,0 +1,129 @@
+import DetectRTC from 'detectrtc'
+
+function loadZoom() {
+  const scriptId = 'face-verification'
+  if (document.getElementById(scriptId)) return
+
+  const resourceBaseUrl = `/${Hash}/verification`
+
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.id = scriptId
+    script.type = 'text/javascript'
+
+    script.onload = () => {
+      FaceTecSDK.setResourceDirectory(`${resourceBaseUrl}/resources`)
+      FaceTecSDK.setImagesDirectory(`${resourceBaseUrl}/images`)
+
+      console.warn('Version:', FaceTecSDK.version())
+
+      resolve()
+    }
+
+    script.src = `${resourceBaseUrl}/FaceTecSDK.js`
+    document.head.appendChild(script)
+  })
+}
+
+export async function getBrowserData() {
+  await loadZoom()
+  const browserData = {
+    DetectRTC,
+    browserName: DetectRTC.browser.name.toLowerCase(),
+    osName: DetectRTC.osName.toLowerCase(),
+    isMobileDevice: isLikelyMobileDevice(),
+    isIOS: false,
+    isAndroid: false,
+    supported: false,
+    hasWebcam: false,
+    hasPermissions: false
+  }
+
+  if (browserData.isMobileDevice) {
+    const { osName } = browserData
+    browserData.isIOS = osName.includes('ios')
+    browserData.isAndroid = osName.includes('android')
+
+    if (browserData.isAndroid) {
+      if (isLikelySamsungBrowser(browserData)) {
+        browserData.DetectRTC.browser.isSamsung = true
+      } else if (isLikelyHuaweiBrowser()) {
+        browserData.browserName = 'huaweibrowser'
+        browserData.DetectRTC.browser.name = 'HuaweiBrowser'
+        browserData.DetectRTC.browser.isChrome = false
+        browserData.DetectRTC.browser.isSafari = false
+        browserData.DetectRTC.browser.isHuaweiBrowser = true
+      }
+    }
+  } else if (isLikelyIosDevice()) {
+    browserData.isMobileDevice = true
+    browserData.isIOS = true
+  }
+
+  const {
+    isChrome,
+    isFirefox,
+    isSamsung,
+    isSafari,
+    isHuaweiBrowser
+  } = DetectRTC.browser
+  console.log('browserData', browserData)
+  browserData.supported =
+    (!browserData.isIOS &&
+      (isChrome || isSamsung || isSafari || isHuaweiBrowser)) ||
+    (!browserData.isMobileDevice && isFirefox) ||
+    (browserData.isIOS && (isSafari || isChrome)) ||
+    false
+
+  if (browserData.supported) {
+    await LoadCamera(browserData)
+  }
+
+  return browserData
+}
+
+function isLikelyHuaweiBrowser() {
+  return navigator.userAgent.includes('HuaweiBrowser')
+}
+
+function isLikelySamsungBrowser(browserData) {
+  return browserData.browserName.includes('samsung')
+}
+
+function isLikelyMobileDevice() {
+  let isMobileDeviceUA = !!/Android|iPhone|iPad|iPod|IEMobile|Mobile|mobile|HarmonyOS/i.test(
+    navigator.userAgent || ''
+  )
+
+  if (
+    isMobileDeviceUA &&
+    (navigator.userAgent.includes('CrOS') ||
+      navigator.userAgent.includes('Chromebook'))
+  ) {
+    isMobileDeviceUA = false
+  }
+
+  return isMobileDeviceUA
+}
+
+function isLikelyIosDevice() {
+  return (
+    navigator.userAgent.match(/Mac/) &&
+    navigator.maxTouchPoints &&
+    navigator.maxTouchPoints > 2
+  )
+}
+
+function LoadCamera(browserData) {
+  return new Promise((resolve) => {
+    DetectRTC.load(() => {
+      browserData.hasWebcam = DetectRTC.hasWebcam
+      browserData.hasPermissions = DetectRTC.isWebsiteHasWebcamPermissions
+      resolve()
+    })
+  })
+}
+
+export function isMobileDevice() {
+  return isLikelyMobileDevice() || isLikelyIosDevice()
+}

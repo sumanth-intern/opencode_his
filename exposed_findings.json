@@ -1,0 +1,12 @@
+{
+  "target": "https://paplweb.parleagro.com",
+  "findings": [
+    {
+      "url": "https://paplweb.parleagro.com/docs/",
+      "status": 200,
+      "size": 15093,
+      "description": "Documentation directory",
+      "snippet": "<!DOCTYPE html SYSTEM \"about:legacy-compat\">\r\n<html lang=\"en\"><head><META http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><link href=\"./images/docs-stylesheet.css\" rel=\"stylesheet\" type=\""
+    }
+  ]
+}

@@ -1,0 +1,551 @@
+import { activityLogger } from '@src/scripts/activityLogger'
+import api, { get, sendFile } from '@src/scripts/api'
+import { errorTypes } from '@src/scripts/enums'
+import { popUp } from '@src/components/popUp'
+import { mediaSourceTypes } from '@src/scripts/enums'
+import mutations from '@src/store/mutations'
+import { ZOOM_TRANSLATIONS_CHECK_INTERVAL } from '@src/scripts/constants'
+import Store from '@src/store'
+import actions from '@src/store/actions'
+import Router from '@src/scripts/router'
+import { getCssVarValue } from '@src/scripts/helpers'
+import JSZip from 'jszip'
+import { redirectFailure } from './routerManager'
+import { FaceTecOverride } from '@src/scripts/faceTecOverride'
+import { MIN_AUDIT_TRAIL_COUNT } from './constants'
+
+export default class {
+  get mode() {
+    return mediaSourceTypes.video
+  }
+
+  callback = {
+    captureCompleted: null
+  }
+
+  state = {
+    license: null,
+    accessToken: null,
+    isSuccess: false,
+    sessionResult: null,
+    readyState: null,
+    requestController: null,
+    changeAvailable: false,
+    listener: null,
+    progressResolve: null,
+    deviceLicenseKeyIdentifier: null,
+    publicFaceMapEncryptionKey: null,
+    activityLog: {
+      canBtnRetryLog: true
+    },
+    faceTecOverride: null
+  }
+
+  global = {
+    ValidationMethod: null,
+    IsFaceAuthenticationActive: false,
+    isFailureUrlAvailable: null
+  }
+
+  // public
+  constructor(props) {
+    const { checkMethod, isFaceAuthenticationActive, isFailureUrlAvailable } =
+      props ?? {}
+
+    this.global.ValidationMethod = checkMethod
+    this.global.IsFaceAuthenticationActive = isFaceAuthenticationActive
+    this.global.isFailureUrlAvailable = isFailureUrlAvailable
+
+    this.state.faceTecOverride = new FaceTecOverride()
+  }
+
+  async init() {
+    try {
+      const [license, accessToken] = await Promise.all([
+        this.getLicense(),
+        this.getAccessToken()
+      ])
+
+      this.state.license = license
+      this.state.deviceLicenseKeyIdentifier = license.deviceKeyIdentifier
+      this.state.publicFaceMapEncryptionKey =
+        license.publicFaceScanEncryptionKey
+      this.state.accessToken = accessToken
+      this.interfaceInit()
+      await this.initZoom()
+      this.initListener()
+
+      return true
+    } catch (error) {
+      console.error('error', error)
+      return false
+    }
+  }
+
+  changeCamera() {}
+
+  capture() {
+    return new Promise((resolve) => this.startZoom(resolve))
+  }
+
+  cancel() {
+    this.destroyListener()
+  }
+
+  // private
+  initZoom() {
+    const status = FaceTecSDK.getStatus()
+    if (status === FaceTecSDK.FaceTecSDKStatus.Initialized) return
+
+    FaceTecSDK.setMaxAuditTrailImages(
+      FaceTecSDK.FaceTecAuditTrailImagesToReturn.UP_TO_SIX
+    )
+    return new Promise((resolve) => this.initialize(resolve))
+  }
+
+  initialize(resolve) {
+    const timer = setInterval(() => {
+      if (window.zoomTranslations) {
+        clearInterval(timer)
+
+        FaceTecSDK.initializeInProductionMode(
+          this.state.license,
+          this.state.deviceLicenseKeyIdentifier,
+          this.state.publicFaceMapEncryptionKey,
+          (isSuccess) => {
+            if (isSuccess) {
+              FaceTecSDK.configureLocalization(window.zoomTranslations)
+
+              resolve()
+            } else {
+              const status = FaceTecSDK.getStatus()
+              if (
+                status === FaceTecSDK.FaceTecSDKStatus.DeviceInLandscapeMode
+              ) {
+                window.onorientationchange = (event) => {
+                  if (
+                    !event.target.screen.orientation.type.includes('portrait')
+                  )
+                    return
+
+                  window.onorientationchange = null
+                  resolve()
+                }
+              } else {
+                resolve()
+              }
+            }
+          }
+        )
+      }
+    }, ZOOM_TRANSLATIONS_CHECK_INTERVAL)
+  }
+
+  initListener() {
+    this.state.listener = new MutationObserver(() => this.errorLoaded())
+    this.state.listener.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    })
+
+    this.state.faceTecOverride.addBodyMutationListener()
+  }
+
+  destroyListener() {
+    if (!this.state.listener) return
+
+    this.state.listener.disconnect()
+    this.state.listener = null
+  }
+
+  errorLoaded() {
+    const element = document.getElementById('DOM_FT_cameraPermissionsScreen')
+
+    if (element && element.style.display) {
+      element.remove()
+      activityLogger.logActivity('NO_CAMERA_PERMISSIONS')
+      popUp(errorTypes.noPermissions)
+      this.facetecCancellation()
+      throw { type: errorTypes.noPermissions }
+    }
+  }
+
+  startZoom(resolve) {
+    this.state.progressResolve = resolve
+    try {
+      new FaceTecSDK.FaceTecSession(this, this.state.accessToken)
+      this.addExtraAction()
+    } catch (error) {
+      console.error(error)
+      resolve({ error: 'Failed' })
+    }
+  }
+
+  async processSessionResultWhileFaceTecSDKWaits(
+    sessionResult,
+    resultCallback
+  ) {
+    this.state.sessionResult = null
+
+    const { status, ...faceMetrics } = sessionResult
+
+    if (
+      status !== FaceTecSDK.FaceTecSessionStatus.SessionCompletedSuccessfully ||
+      !faceMetrics.faceScan?.length
+    ) {
+      if (status === FaceTecSDK.FaceTecSessionStatus.LockedOut) {
+        this.state.sessionResult = { error: 'Face.TooMuchTimeToDetectFace' }
+      } else if (
+        status === FaceTecSDK.FaceTecSessionStatus.LandscapeModeNotAllowed
+      ) {
+        this.state.sessionResult = { error: 'Face.DeviceInLandscapeMode' }
+      } else if (!faceMetrics.faceScan?.length) {
+        this.state.sessionResult = { error: 'Face.Failed' }
+      }
+
+      this.cancelInFlightRequests()
+      resultCallback.cancel()
+      return
+    }
+
+    if (faceMetrics.auditTrail.length < MIN_AUDIT_TRAIL_COUNT) {
+      activityLogger.logActivity('TOO_FEW_AUDIT_TRAIL_IMAGES')
+      resultCallback.retry()
+      return
+    }
+
+    const validationStatus = await this.validateFace(faceMetrics)
+    if (validationStatus === 'SUCCESS') {
+      this.state.sessionResult = { data: true }
+      resultCallback.succeed()
+    } else if (validationStatus === 'RETRY') {
+      resultCallback.retry()
+    } else {
+      resultCallback.cancel()
+    }
+  }
+
+  onFaceTecSDKCompletelyDone() {
+    const { sessionResult, progressResolve } = this.state
+    if (sessionResult) {
+      if (sessionResult.data) {
+        this.callback.captureCompleted?.()
+      }
+      progressResolve(sessionResult)
+      this.state.sessionResult = null
+    } else {
+      progressResolve({})
+    }
+  }
+
+  async validateFace(faceMetrics) {
+    const body = await this.createValidationBody(faceMetrics)
+
+    try {
+      const { error } = await sendFile(this.global.ValidationMethod, body)
+      if (error) return 'RETRY'
+
+      return 'SUCCESS'
+    } catch (error) {
+      return 'FAIL'
+    }
+  }
+
+  async createValidationBody(faceMetrics) {
+    const zip = new JSZip()
+    zip.file('faceScan', faceMetrics.faceScan)
+
+    const auditTrail = zip.folder('auditTrail')
+    for (const index in faceMetrics.auditTrail) {
+      const image = faceMetrics.auditTrail[index]
+      auditTrail.file(`${index}.jpg`, image, { base64: true })
+    }
+
+    const lowQualityAuditTrail = zip.folder('lowQualityAuditTrail')
+    for (const index in faceMetrics.lowQualityAuditTrail) {
+      const image = faceMetrics.lowQualityAuditTrail[index]
+      lowQualityAuditTrail.file(`${index}.jpg`, image, { base64: true })
+    }
+
+    const dataToUpload = new FormData()
+    dataToUpload.append('sessionId', faceMetrics.sessionId)
+    dataToUpload.append(
+      'sessionData',
+      await zip.generateAsync({ type: 'blob' })
+    )
+    dataToUpload.append(
+      'sessionUserAgent',
+      FaceTecSDK.createFaceTecAPIUserAgentString(faceMetrics.sessionId)
+    )
+
+    return dataToUpload
+  }
+
+  interfaceInit() {
+    const standardTheme = this.getStandardTheme()
+    const lowLightTheme = this.getLowLightTheme()
+
+    FaceTecSDK.setCustomization(standardTheme)
+    FaceTecSDK.setLowLightCustomization(lowLightTheme)
+  }
+
+  async getAccessToken() {
+    const response = await get(api.getFaceTecToken)
+    return response.data.token
+  }
+
+  async getLicense() {
+    const response = await get(api.getFaceTecLicense)
+    return response.data
+  }
+
+  cancelInFlightRequests() {
+    if (!this.state.requestController) return
+    this.state.requestController.abort()
+    this.state.requestController = null
+  }
+
+  getStandardTheme() {
+    const customization = new FaceTecSDK.FaceTecCustomization()
+
+    const vars = {
+      brand: getCssVarValue('--brand'),
+      additionalBrand: getCssVarValue('--additional-brand'),
+      backgroundColor: getCssVarValue('--page-color'),
+      dark: getCssVarValue('--dark'),
+      white: getCssVarValue('--white'),
+      loader: {
+        primaryColor: getCssVarValue('--loader-color-primary'),
+        additionalColor: getCssVarValue('--loader-color-additional'),
+        textColor: getCssVarValue('--loader-text-color'),
+        fontFamily: getCssVarValue('--header-font-family'),
+        fontSize: '1rem'
+      },
+      header: {
+        color: getCssVarValue('--header-contrast-color'),
+        fontFamily: getCssVarValue('--header-font-family'),
+        fontSize: getCssVarValue('--header-font-size-additional')
+      },
+      text: {
+        color: getCssVarValue('--text-contrast-color'),
+        fontFamily: getCssVarValue('--text-font-family'),
+        fontSize: getCssVarValue('--text-font-size')
+      },
+      button: {
+        fontFamily: getCssVarValue('--button-font-family'),
+        fontSize: getCssVarValue('--button-font-size'),
+        background: getCssVarValue('--button-primary-background'),
+        disabledBackground: getCssVarValue(
+          '--button-primary-background-color-disabled'
+        ),
+        disabledColor: getCssVarValue('--button-primary-color-disabled'),
+        color: getCssVarValue('--button-primary-color'),
+        radius: getCssVarValue('--button-primary-border-radius'),
+        backgroundHover: getCssVarValue('--button-primary-background-hover'),
+        colorHover: getCssVarValue('--button-primary-color-hover')
+      },
+      progressBar: {
+        background: getCssVarValue('--progress-bar-background'),
+        color: getCssVarValue('--progress-bar-color')
+      }
+    }
+
+    const mappedStyleVars = {
+      initialLoadingAnimationCustomization: {
+        animationRelativeScale: 1.25,
+        backgroundColor: vars.loader.primaryColor,
+        foregroundColor: vars.loader.additionalColor,
+        messageTextColor: vars.loader.textColor,
+        messageFont: vars.loader.fontFamily,
+        messageTextSize: vars.loader.fontSize
+      },
+      overlayCustomization: {
+        backgroundColor: vars.backgroundColor,
+        showBrandingImage: false
+      },
+      guidanceCustomization: {
+        backgroundColors: vars.backgroundColor,
+        foregroundColor: vars.text.color,
+        headerFont: vars.header.fontFamily,
+        headerTextSize: vars.header.fontSize,
+        subtextFont: vars.text.fontFamily,
+        subtextTextSize: vars.text.fontSize,
+        readyScreenHeaderTextColor: vars.header.color,
+        retryScreenImageBorderColor: vars.brand,
+        retryScreenImageBorderWidth: '1px',
+        retryScreenImageCornerRadius: '.5rem',
+        buttonFont: vars.button.fontFamily,
+        buttonTextSize: vars.button.fontSize,
+        buttonTextNormalColor: vars.button.color,
+        buttonBackgroundDisabledColor: vars.button.disabledBackground,
+        buttonBackgroundNormalColor: vars.button.background,
+        buttonTextHighlightColor: vars.button.colorHover,
+        buttonBackgroundHighlightColor: vars.button.backgroundHover,
+        buttonTextDisabledColor: vars.button.disabledColor,
+        buttonCornerRadius: vars.button.radius,
+        buttonRelativeWidth: 'auto',
+        buttonRelativeWidthOnDesktop: '0.3'
+      },
+      frameCustomization: {
+        backgroundColor: vars.backgroundColor,
+        borderColor: vars.backgroundColor
+      },
+      ovalCustomization: {
+        strokeColor: vars.dark,
+        progressColor1: vars.brand,
+        progressColor2: vars.additionalBrand
+      },
+      cancelButtonCustomization: {
+        location: FaceTecSDK.FaceTecCancelButtonLocation.Disabled
+      },
+      resultScreenCustomization: {
+        backgroundColors: vars.backgroundColor,
+        foregroundColor: vars.text.color,
+        messageFont: vars.text.fontFamily,
+        messageTextSize: vars.text.fontSize,
+        activityIndicatorColor: vars.brand,
+        resultAnimationBackgroundColor: vars.brand,
+        resultAnimationForegroundColor: vars.white,
+        showUploadProgressBar: true,
+        uploadProgressTrackColor: vars.progressBar.background,
+        uploadProgressFillColor: vars.progressBar.color
+      },
+      feedbackCustomization: {
+        backgroundColor: 'rgba(255,255,255,.7)',
+        textColor: vars.text.color,
+        textFont: vars.text.fontFamily,
+        textSize: vars.text.fontSize,
+        cornerRadius: '2rem',
+        shadow: '0 .5rem 1rem rgba(0, 0, 0, .3)'
+      },
+      vocalGuidanceCustomization: {
+        mode: 2
+      }
+    }
+
+    Object.entries(mappedStyleVars).forEach(([key, subObject]) => {
+      Object.entries(subObject).forEach(([subKey, styleValue]) => {
+        if (styleValue !== null) {
+          customization[key][subKey] = styleValue
+        }
+      })
+    })
+    return customization
+  }
+
+  getLowLightTheme() {
+    return null
+  }
+
+  facetecCancellation() {
+    const cancel = document.getElementById('DOM_FT_cancelCustomButtonElement')
+    cancel.dispatchEvent(new Event('mousedown'))
+
+    const videoEl = document.querySelector(
+      '#DOM_FT_PRIMARY_TOPLEVEL_mainContainer video'
+    )
+    const stream = videoEl?.srcObject
+
+    const tracks = stream?.getTracks()
+    tracks?.forEach(function (track) {
+      track?.stop()
+    })
+
+    const facetecParentEl = document.getElementById(
+      'DOM_FT_PRIMARY_TOPLEVEL_mainContainer'
+    )
+    facetecParentEl?.remove()
+  }
+
+  addExtraAction() {
+    if (Store.getters.isOmnichannelVisible) {
+      this.addMobileLink()
+    }
+
+    if (Store.getters.isPassiveLivenessAvailable) {
+      this.state.faceTecOverride.addExtraAction({
+        label: window.zoomTranslations?.FaceTec_feedback_need_help,
+        onClick: () => {
+          Store.commit(mutations.disableLiveness)
+          this.facetecCancellation()
+        }
+      })
+
+      return
+    }
+
+    if (
+      this.global.IsFaceAuthenticationActive &&
+      this.global.isFailureUrlAvailable
+    ) {
+      this.state.faceTecOverride.addExtraAction({
+        label: window.zoomTranslations?.FaceTec_redirect_home,
+        onClick: () => {
+          redirectFailure()
+          this.facetecCancellation()
+        }
+      })
+    }
+  }
+
+  async getMobileIcon() {
+    try {
+      const response = await fetch('/public/images/mobileIcon.svg', {
+        method: 'GET'
+      })
+
+      const svgString = await response.text()
+
+      const parser = new DOMParser()
+      const svg = parser
+        .parseFromString(svgString, 'image/svg+xml')
+        .querySelector('svg')
+
+      if (!svg) {
+        return null
+      }
+      return svg
+    } catch (error) {
+      console.error('error', error)
+      return false
+    }
+  }
+
+  async addMobileLink() {
+    const block = document.getElementById('DOM_FT_overlayContainer')
+    if (!block) return
+
+    const element = document.createElement('div')
+    element.setAttribute('id', 'footerContainer')
+    element.style.display = 'none'
+    const leftContainer = document.createElement('div')
+    leftContainer.classList.add('mobileIcon')
+    const mobileIconSvg = await this.getMobileIcon()
+    leftContainer.appendChild(mobileIconSvg)
+    const rightContainer = document.createElement('div')
+    const text1Container = document.createElement('div')
+    const text2Container = document.createElement('div')
+    const text1 = document.createTextNode(
+      window.zoomTranslations?.FaceTec_having_problems
+    )
+    const text2 = document.createElement('span')
+    text2.classList.add('link')
+    text2.appendChild(
+      document.createTextNode(window.zoomTranslations?.FaceTec_use_phone)
+    )
+    text2.onclick = () => {
+      Store.dispatch(actions.activateOmnichannel)
+      Router.pushNext({ indexStep: 0 })
+      this.facetecCancellation()
+    }
+    text1Container.appendChild(text1)
+    text2Container.appendChild(text2)
+    rightContainer.appendChild(text1Container)
+    rightContainer.appendChild(text2Container)
+    element.appendChild(leftContainer)
+    element.appendChild(rightContainer)
+
+    block.appendChild(element)
+  }
+}

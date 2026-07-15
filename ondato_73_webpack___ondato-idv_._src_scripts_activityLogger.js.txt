@@ -1,0 +1,23 @@
+import Api, { call } from '@src/scripts/api'
+
+const activityLoggerInit = () => {
+  async function logActivity(logType) {
+    if (!logType) return
+    try {
+      await call(Api.actionLog, {
+        action: logType
+      })
+      window.log(logType)
+    } catch (error) {
+      if (error === 400) {
+        console.error('Action not found:', logType)
+      }
+    }
+  }
+
+  return {
+    logActivity
+  }
+}
+
+export const activityLogger = activityLoggerInit()
